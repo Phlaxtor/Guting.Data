@@ -1,21 +1,36 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 
 namespace Guting.Data
 {
-    public abstract class Row
+    public abstract class Row : Node<Row>, IEquatable<Row>
     {
         internal Row(Table table)
         {
             Table = table;
             Id = table.GetNextId();
+            Cells = new RowCells();
         }
 
-        protected Table Table { get; }
+        public Table Table { get; }
         public int Index { get; internal set; }
         public string Id { get; }
         public string Name { get; set; }
+        internal RowCells Cells { get; }
+
+        protected override bool IsEqualNodeValue(Row other)
+        {
+            return Equals(other);
+        }
+
+        public bool Equals(Row other)
+        {
+            if (other != null)
+            {
+                return other.Id == Id;
+            }
+            return false;
+        }
     }
 
     public abstract class Row<TCell> : Row
@@ -25,7 +40,13 @@ namespace Guting.Data
         {
         }
 
-        public CellCollection<TCell> Cells { get; private set; }
+        public IEnumerable<TCell> GetCells()
+        {
+            foreach (var node in Cells)
+            {
+                yield return (TCell)node.Cell;
+            }
+        }
     }
 
     public sealed class GenericRow<T> : Row<GenericCell<T>> where T : IComparable<T>, IEquatable<T>
@@ -56,50 +77,46 @@ namespace Guting.Data
         }
     }
 
-    public sealed class RowEnumerator<TRow> : IEnumerator<TRow>, IEnumerator, IDisposable, ICloneable
-       where TRow : Row
+    public sealed class Rows : LinkedNodeList<Row>
     {
-        private TRow _current;
-        private int _index;
-
-        internal RowEnumerator()
-        {
-            _index = -1;
-            _current = null;
-        }
-
-        public TRow Current => _current;
-
-        object IEnumerator.Current => _current;
-
-        public object Clone()
-        {
-            return new RowEnumerator<TRow>();
-        }
-
-        public void Dispose()
-        {
-            _index = -1;
-            _current = null;
-        }
-
-        public bool MoveNext()
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Reset()
-        {
-            _index = -1;
-            _current = null;
-        }
     }
 
-    public sealed class RowCollection<TRow> : ICloneable, IEnumerable, ICollection, IList, IEnumerable<TRow>, ICollection<TRow>, IList<TRow>
-      where TRow : Row
+    public sealed class RowCells : LinkedNodeList<TableRowCellNode>
     {
-        internal RowCollection()
+    }
+
+    public sealed class TableRowCellNode : Node
+    {
+        internal TableRowCellNode(TableNode node)
         {
+            Node = node;
+        }
+
+        public TableNode Node { get; }
+
+        public Cell Cell => (Cell)Node.GetValue();
+
+        internal override Node GetNext() => Node.GetNextRow();
+
+        internal override Node GetPrevious() => Node.GetPreviousRow();
+
+        internal override bool IsEqualNodeValue(Node other)
+        {
+            if (other is TableRowCellNode node)
+            {
+                return Cell.Equals(node.Cell);
+            }
+            return false;
+        }
+
+        internal override void SetNext(Node node)
+        {
+            Node.SetNextRow(node);
+        }
+
+        internal override void SetPrevious(Node node)
+        {
+            Node.SetPreviousRow(node);
         }
     }
 }
